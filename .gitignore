@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# generated demo artefacts
+demo_landscape.png
+demo_torch_landscape.png
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
