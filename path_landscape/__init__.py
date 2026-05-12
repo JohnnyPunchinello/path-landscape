@@ -24,6 +24,17 @@ from .similarity import (
     similarity_matrix,
 )
 from .landscape import PathLandscape, ClusterSummary
+from .metrics import (
+    n_modes,
+    size_exponent,
+    persistence_h0,
+    persistence_h1,
+    meta_graph,
+    meta_graph_metrics,
+    summarize,
+    compare,
+    format_comparison,
+)
 
 __all__ = [
     "System",
@@ -38,4 +49,13 @@ __all__ = [
     "similarity_matrix",
     "PathLandscape",
     "ClusterSummary",
+    "n_modes",
+    "size_exponent",
+    "persistence_h0",
+    "persistence_h1",
+    "meta_graph",
+    "meta_graph_metrics",
+    "summarize",
+    "compare",
+    "format_comparison",
 ]

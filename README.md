@@ -46,6 +46,7 @@ Run the bundled demos:
 ```bash
 python demo.py          # 4 structural examples; saves demo_landscape.png
 python demo_torch.py    # trains a small MLP, plots structural vs functional landscapes
+python demo_compare.py  # side-by-side landscape comparison (4 metrics + persistence)
 ```
 
 ---
@@ -200,6 +201,31 @@ The structural landscape (`|W|`) reflects what the network *could* compute; the 
 
 ---
 
+## Cross-system comparison metrics
+
+`path_landscape.metrics` exposes four scalar/structural summaries designed for
+matched-task comparison across systems (e.g., trained LLM vs. biological
+circuit on the same task):
+
+```python
+from path_landscape import compare, format_comparison
+
+cmp = compare(L1, L2, names=("LLM", "brain"))
+print(format_comparison(cmp))
+```
+
+The four metrics:
+
+| metric | what it captures |
+| --- | --- |
+| `n_modes(L)` | number of distinct ways the system computes |
+| `size_exponent(L)` | Zipf-style exponent of cluster sizes; heavy tails -> compositional |
+| `persistence_h0(L)` / `persistence_h1(L)` | birth/death of clusters (H0) and irreducible loops (H1) under increasing distance threshold; topological signature |
+| `meta_graph_metrics(L)` | connectivity of the cluster meta-graph (recombinability) — number of clusters, giant-component fraction, mean degree, edge density |
+
+`persistence_h1` requires the optional `ripser` package; `persistence_h0`
+needs only `scipy`. See `demo_compare.py` for an end-to-end example.
+
 ## What's in the package
 
 ```
@@ -211,8 +237,11 @@ path_landscape/
   examples.py      # feedforward_chain, feedforward_with_skip, simple_rnn,
                    # mixture_of_experts, hierarchical_mlp, two_module_network
   torch_bridge.py  # mlp_to_system, rnncell_to_system, reweight_*, train_toy_mlp
+  metrics.py       # n_modes, size_exponent, persistence_h0/h1,
+                   # meta_graph, compare, format_comparison
 demo.py            # structural examples; saves demo_landscape.png
 demo_torch.py      # trained-MLP landscape; saves demo_torch_landscape.png
+demo_compare.py    # side-by-side comparison of two systems (4 metrics + persistence)
 ```
 
 ---
