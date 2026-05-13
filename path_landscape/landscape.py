@@ -176,6 +176,113 @@ class PathLandscape:
             ax.legend(loc="best", fontsize=8, frameon=False)
         return ax
 
+    def plot_length_by_cluster(
+        self,
+        ax=None,
+        sort_within: bool = True,
+        title: Optional[str] = None,
+        show_weight: bool = True,
+        drop_noise: bool = False,
+        label_top_k: int = 8,
+    ):
+        """Bar plot: each path is a thin vertical bar.
+
+        - x-axis: paths grouped by cluster, ordered by length within each cluster.
+        - y-axis: path length.
+        - color : cluster label (noise paths in gray).
+        - bar opacity (optional, `show_weight=True`) reflects path weight.
+
+        Cluster boundaries are drawn as faint vertical lines. Cluster labels
+        are written *above* the tallest bar in each cluster, but only for the
+        `label_top_k` largest clusters (to keep the plot readable when there
+        are many modes). Set `drop_noise=True` to hide noise points.
+        """
+        import matplotlib.pyplot as plt
+
+        if ax is None:
+            _, ax = plt.subplots(figsize=(11, 4.5))
+        labels = self.labels
+        n_total = len(self.paths)
+        keep = list(range(n_total))
+        if drop_noise:
+            keep = [i for i in keep if labels[i] != -1]
+        n = len(keep)
+        # Order: noise (-1) at the right; clusters by id; within cluster by length.
+        keep.sort(key=lambda i: (
+            (10**9 if labels[i] == -1 else int(labels[i])),
+            (self.paths[i].length if sort_within else 0),
+            -float(self.paths[i].weight),
+        ))
+
+        unique = sorted(set(labels[i] for i in keep))
+        cmap = plt.get_cmap("tab20" if len(unique) > 10 else "tab10")
+        cluster_color = {}
+        ci = 0
+        for c in unique:
+            if c == -1:
+                cluster_color[c] = (0.78, 0.78, 0.82)
+            else:
+                cluster_color[c] = cmap(ci % cmap.N)
+                ci += 1
+
+        x = np.arange(n)
+        lengths = np.array([self.paths[i].length for i in keep])
+        weights = np.array([self.paths[i].weight for i in keep], dtype=float)
+        colors = [cluster_color[labels[i]] for i in keep]
+
+        # Use a single ax.bar call for speed; alpha-vary by weight if requested.
+        if show_weight and weights.max() > 0:
+            alphas = 0.40 + 0.55 * (weights / weights.max())
+            rgba = []
+            for col, a in zip(colors, alphas):
+                r, g, b = col[:3]
+                rgba.append((r, g, b, float(a)))
+            ax.bar(x, lengths, color=rgba, width=1.0, edgecolor="none")
+        else:
+            ax.bar(x, lengths, color=colors, width=1.0, edgecolor="none")
+
+        # Per-cluster boundaries + counts. Label only the top-k by size.
+        cluster_runs: list[tuple[int, int, int]] = []   # (label, start, end)
+        prev = None; start = 0
+        for i, idx_ord in enumerate(keep):
+            c = int(labels[idx_ord])
+            if c != prev:
+                if prev is not None:
+                    cluster_runs.append((prev, start, i))
+                    ax.axvline(i - 0.5, color="black", alpha=0.18,
+                               linewidth=0.4)
+                start = i; prev = c
+        if prev is not None:
+            cluster_runs.append((prev, start, n))
+
+        cluster_runs_sorted = sorted(
+            cluster_runs, key=lambda r: -(r[2] - r[1])
+        )
+        max_len = float(max(lengths.max(), 1))
+        ax.set_ylim(0, max_len * 1.18)
+        for k, (c, s, e) in enumerate(cluster_runs_sorted[:label_top_k]):
+            mid = (s + e - 1) / 2.0
+            label = "noise" if c == -1 else f"m{c}"
+            ax.text(mid, max_len * 1.04, label,
+                    ha="center", va="bottom", fontsize=7,
+                    color=cluster_color[c])
+
+        ax.set_xlim(-0.5, max(n - 0.5, 0.5))
+        ax.set_xticks([])
+        ax.set_ylabel("path length")
+        ax.set_xlabel(
+            f"paths grouped by cluster, ordered by length"
+            + (f"  (showing {n}/{n_total}; noise hidden)" if drop_noise else
+               f"  (showing all {n})")
+        )
+        if title is None:
+            title = (
+                f"path landscape — lengths x clusters "
+                f"({self.n_modes} mode(s), {n_total} paths)"
+            )
+        ax.set_title(title, fontsize=10)
+        return ax
+
     # ------------------------------------------------------------ summary
 
     def describe(self) -> str:

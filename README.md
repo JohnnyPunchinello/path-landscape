@@ -44,9 +44,11 @@ for c in L.cluster_summary():
 Run the bundled demos:
 
 ```bash
-python demo.py          # 4 structural examples; saves demo_landscape.png
-python demo_torch.py    # trains a small MLP, plots structural vs functional landscapes
-python demo_compare.py  # side-by-side landscape comparison (4 metrics + persistence)
+python demo.py                  # 4 structural examples; saves demo_landscape.png
+python demo_torch.py            # trains a small MLP, plots structural vs functional
+python demo_compare.py          # toy side-by-side comparison (4 metrics + persistence)
+python demo_compare_serious.py  # trains LM-like + Dale's-law-circuit on the same task,
+                                # extracts active paths, compares landscapes
 ```
 
 ---
@@ -239,10 +241,25 @@ path_landscape/
   torch_bridge.py  # mlp_to_system, rnncell_to_system, reweight_*, train_toy_mlp
   metrics.py       # n_modes, size_exponent, persistence_h0/h1,
                    # meta_graph, compare, format_comparison
-demo.py            # structural examples; saves demo_landscape.png
-demo_torch.py      # trained-MLP landscape; saves demo_torch_landscape.png
-demo_compare.py    # side-by-side comparison of two systems (4 metrics + persistence)
+  extract.py       # extract_mlp_flow, extract_rnn_flow, prune_system
+                   # (build active-flow Systems from PyTorch forward passes)
+demo.py                  # structural examples
+demo_torch.py            # trained-MLP structural vs functional landscape
+demo_compare.py          # toy side-by-side comparison
+demo_compare_serious.py  # trained LM-like vs Dale's-law GRU on the same task;
+                         # extracts active paths and compares landscapes
 ```
+
+### Visualizing landscapes two ways
+
+`PathLandscape` exposes two plot methods:
+
+- `plot()` — classical MDS scatter, paths colored by cluster.
+- `plot_length_by_cluster()` — bar plot where each path is a vertical bar:
+  *y-axis = path length*, *x-axis = paths grouped by cluster and ordered by
+  length within*. Bar opacity reflects path weight. Use `drop_noise=True` to
+  hide noise paths. This view makes cluster-size, length-distribution, and
+  per-cluster compactness immediately visible.
 
 ---
 

@@ -36,6 +36,14 @@ from .metrics import (
     format_comparison,
 )
 
+# `extract` requires torch; import lazily so the rest of the package works
+# without it.
+def __getattr__(name):
+    if name in {"extract_mlp_flow", "extract_rnn_flow", "prune_system"}:
+        from . import extract as _extract
+        return getattr(_extract, name)
+    raise AttributeError(name)
+
 __all__ = [
     "System",
     "Unit",
