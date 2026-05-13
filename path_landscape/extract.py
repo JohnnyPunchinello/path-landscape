@@ -99,6 +99,84 @@ def prune_system(
     return new
 
 
+# ---------------------------------------------------- active sub-graph
+
+def unit_activations(
+    model: nn.Module, x: torch.Tensor, prefix: str = "L"
+) -> dict[str, float]:
+    """Return mean |activation| per unit by hooking every `nn.Linear`'s input
+    and output. Naming matches `extract_mlp_flow`: input layer is `L0_n*`,
+    layer i's output is `Li_n*`.
+    """
+    layers = [m for m in model.modules() if isinstance(m, nn.Linear)]
+    if not layers:
+        raise ValueError("no nn.Linear modules in model")
+    inputs_per: list[torch.Tensor] = []
+    outputs_per: list[torch.Tensor] = []
+
+    def make_hook():
+        def hook(_mod, inputs, output):
+            inputs_per.append(inputs[0].detach())
+            outputs_per.append(output.detach())
+        return hook
+
+    handles = [layer.register_forward_hook(make_hook()) for layer in layers]
+    try:
+        model.eval()
+        with torch.no_grad():
+            model(x)
+    finally:
+        for h in handles:
+            h.remove()
+
+    acts: dict[str, float] = {}
+    a0 = inputs_per[0].reshape(-1, layers[0].in_features).abs().mean(dim=0)
+    for k in range(a0.shape[0]):
+        acts[f"{prefix}0_n{k}"] = float(a0[k])
+    for li, out in enumerate(outputs_per, start=1):
+        flat = out.reshape(-1, out.shape[-1]).abs().mean(dim=0)
+        for k in range(flat.shape[0]):
+            acts[f"{prefix}{li}_n{k}"] = float(flat[k])
+    return acts
+
+
+def active_subgraph(
+    sys: System,
+    activations: dict[str, float],
+    threshold: float = 0.0,
+    quantile: Optional[float] = None,
+    keep_io: bool = True,
+) -> System:
+    """Restrict `sys` to units whose activation magnitude is above the
+    threshold (or above the given quantile of the activation distribution).
+
+    `keep_io=True` always preserves declared input/output units.
+    """
+    if quantile is not None:
+        vals = np.array(list(activations.values()))
+        threshold = float(np.quantile(vals, quantile))
+    keep = {n for n, a in activations.items() if a >= threshold}
+    if keep_io:
+        keep |= sys.inputs | sys.outputs
+    new = System()
+    for n in keep:
+        if n in sys.units:
+            u = sys.units[n]
+            new.add_unit(n, scale=u.scale, parent=u.parent, op=u.op)
+    for n in sys.inputs & keep:
+        new.set_input(n)
+    for n in sys.outputs & keep:
+        new.set_output(n)
+    for u, v, data in sys.graph.edges(data=True):
+        if u in keep and v in keep:
+            new.add_edge(
+                u, v,
+                weight=float(data.get("weight", 1.0)),
+                recurrent=bool(data.get("recurrent", False)),
+            )
+    return new
+
+
 # ----------------------------------------------------- MLP active-flow graph
 
 def extract_mlp_flow(
