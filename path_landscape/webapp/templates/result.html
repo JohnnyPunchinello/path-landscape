@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ phenomenon }} - path landscape</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="container">
+  <a href="{{ url_for('index') }}" class="back">&larr; new analysis</a>
+
+  <header class="result-header">
+    <h1>{{ phenomenon }}</h1>
+    <p class="subtitle">{{ phenomenon_summary }}</p>
+  </header>
+
+  <section class="figure-section">
+    <img src="{{ url_for('file', job_id=job_id, filename='landscape.png') }}"
+         alt="Path-landscape figure for {{ phenomenon }}" />
+  </section>
+
+  <section class="metrics-section">
+    <h2>Landscape metrics</h2>
+    <div class="metrics-grid">
+      <div class="metric">
+        <div class="value">{{ metrics.n_modes }}</div>
+        <div class="label">modes</div>
+      </div>
+      <div class="metric">
+        <div class="value">
+          {% if metrics.size_exponent is none or metrics.size_exponent != metrics.size_exponent %}—
+          {% else %}{{ "%.2f"|format(metrics.size_exponent) }}{% endif %}
+        </div>
+        <div class="label">size exponent α</div>
+      </div>
+      <div class="metric">
+        <div class="value">{{ "%.3f"|format(metrics.h0_max) }}</div>
+        <div class="label">H₀ max persistence</div>
+      </div>
+      <div class="metric">
+        <div class="value">
+          {% if metrics.h1_count is none %}—{% else %}{{ metrics.h1_count }}{% endif %}
+        </div>
+        <div class="label">H₁ features</div>
+      </div>
+      <div class="metric">
+        <div class="value">{{ "%.3f"|format(metrics.h1_max_persistence) }}</div>
+        <div class="label">H₁ max persistence</div>
+      </div>
+      <div class="metric">
+        <div class="value">{{ "%.3f"|format(metrics.meta.giant_fraction) }}</div>
+        <div class="label">meta giant fraction</div>
+      </div>
+      <div class="metric">
+        <div class="value">{{ "%.3f"|format(metrics.meta.density) }}</div>
+        <div class="label">meta density</div>
+      </div>
+      <div class="metric">
+        <div class="value">{{ metrics.n_paths }}</div>
+        <div class="label">paths sampled</div>
+      </div>
+    </div>
+    <p class="meta-summary"><span>{{ system_summary }}</span><br>
+      <span>{{ landscape_summary }}</span></p>
+  </section>
+
+  <section class="interpretation-section">
+    <h2>Mechanistic interpretation</h2>
+    <div class="interpretation">{{ interpretation_html | safe }}</div>
+  </section>
+
+  <section class="spec-section">
+    <h2>System specification</h2>
+    <details open>
+      <summary>Units ({{ spec.units | length }})</summary>
+      <table class="spec-table">
+        <thead>
+          <tr><th>name</th><th>role</th><th>scale</th><th>parent</th><th>description</th></tr>
+        </thead>
+        <tbody>
+        {% for u in spec.units %}
+          <tr>
+            <td><code>{{ u.name }}</code></td>
+            <td>{{ u.role }}</td>
+            <td>{{ u.scale }}</td>
+            <td>{{ u.parent or '' }}</td>
+            <td>{{ u.description }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    <details>
+      <summary>Interactions ({{ spec.interactions | length }})</summary>
+      <table class="spec-table">
+        <thead>
+          <tr><th>source</th><th>target</th><th>weight</th><th>recurrent</th><th>description</th></tr>
+        </thead>
+        <tbody>
+        {% for it in spec.interactions %}
+          <tr>
+            <td><code>{{ it.source }}</code></td>
+            <td><code>{{ it.target }}</code></td>
+            <td>{{ "%.2f"|format(it.weight) }}</td>
+            <td>{{ "✓" if it.recurrent else "" }}</td>
+            <td>{{ it.description }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% if spec.parameters %}
+    <details>
+      <summary>External parameters ({{ spec.parameters | length }})</summary>
+      <ul class="param-list">
+        {% for p in spec.parameters %}
+        <li><code>{{ p.name }}</code>{% if p.value %} = {{ p.value }}{% endif %} - {{ p.role }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+    {% if spec.notes %}
+    <p class="notes"><strong>Notes:</strong> {{ spec.notes }}</p>
+    {% endif %}
+  </section>
+
+  <section class="downloads">
+    <a class="download" href="{{ url_for('file', job_id=job_id, filename='report.md') }}"
+       download>report.md</a>
+    <a class="download" href="{{ url_for('file', job_id=job_id, filename='spec.json') }}"
+       download>spec.json</a>
+    <a class="download" href="{{ url_for('file', job_id=job_id, filename='landscape.png') }}"
+       download>landscape.png</a>
+  </section>
+</main>
+</body>
+</html>

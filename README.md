@@ -267,6 +267,24 @@ python demo_agent.py "Chain-of-thought reasoning emerging in a large language mo
 python demo_agent.py --all   # runs the 5 bundled example phenomena
 ```
 
+### Local web UI
+
+A browser frontend wraps the same pipeline with live progress streaming:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python serve_agent.py            # http://127.0.0.1:5174
+# or: python -m path_landscape.webapp --port 8000 --out ./runs
+```
+
+Type a phenomenon, click *Analyze*, and watch a progress bar + event log as
+the pipeline runs (Server-Sent Events stream from a background thread). When
+finished, the page redirects to a result view with the multi-panel figure,
+the four landscape metrics as a metric grid, the LLM interpretation rendered
+from markdown, the full system spec in collapsible tables, and download
+links for `report.md` / `spec.json` / `landscape.png`. Built on Flask;
+needs `pip install flask markdown` in addition to `anthropic`.
+
 The default model is `claude-opus-4-7`. The specifier uses tool use with
 `effort: medium`; the interpreter uses adaptive thinking with `effort: high`
 so its analysis is substantive. System prompts are prompt-cached.
@@ -293,11 +311,16 @@ path_landscape/
     pipeline.py    #   specify_system, run_analysis, interpret, analyze_emergence
     visualize.py   #   multi-panel system + landscape + persistence figure
     report.py      #   markdown report + spec.json
+  webapp/          # browser frontend (Flask + SSE)
+    server.py      #   routes, job queue, SSE streaming
+    templates/     #   index, result, error, pending
+    static/        #   style.css, script.js (vanilla, no framework)
 demo.py                  # structural examples
 demo_torch.py            # trained-MLP structural vs functional landscape
 demo_compare.py          # toy side-by-side comparison
 demo_compare_serious.py  # LM-like vs Dale's-law-circuit on the same task
 demo_agent.py            # end-to-end LLM-powered analysis (requires API key)
+serve_agent.py           # local web UI for the agent pipeline (Flask + SSE)
 ```
 
 ### Visualizing landscapes two ways

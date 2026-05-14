@@ -254,40 +254,53 @@ def analyze_emergence(
     client: Optional["anthropic.Anthropic"] = None,
     model: str = DEFAULT_MODEL,
     verbose: bool = True,
+    on_progress: Optional[callable] = None,
 ) -> dict:
-    """Full pipeline: phenomenon (str) -> on-disk artifacts + result dict."""
+    """Full pipeline: phenomenon (str) -> on-disk artifacts + result dict.
+
+    `on_progress` is an optional callback `on_progress(step, percent, message)`
+    invoked at each pipeline stage. The web frontend uses this to stream
+    progress to the browser.
+    """
     from .visualize import render_figure
     from .report import write_report, write_spec_json
+
+    def _emit(step: str, percent: int, message: str) -> None:
+        if verbose:
+            print(f"  [{percent:3d}%] {step}: {message}")
+        if on_progress:
+            try:
+                on_progress(step, percent, message)
+            except Exception:
+                pass  # don't let the callback crash the pipeline
 
     os.makedirs(out_dir, exist_ok=True)
     client = client or anthropic.Anthropic()
 
-    if verbose:
-        print(f"[1/4] specifying system for: {phenomenon!r}")
+    _emit("specifying", 5,
+          f"calling Claude to specify the system for {phenomenon!r}...")
     t0 = time.time()
     spec = specify_system(phenomenon, client=client, model=model)
-    if verbose:
-        print(f"      done in {time.time() - t0:.1f}s -- {spec.summary()}")
+    _emit("specified", 30,
+          f"got spec in {time.time() - t0:.1f}s -- {spec.summary()}")
 
-    if verbose:
-        print(f"[2/4] building system and extracting paths "
-              f"(T={spec.time_steps})...")
+    _emit("building", 35,
+          f"building System and extracting paths (T={spec.time_steps})...")
     t0 = time.time()
     result = run_analysis(spec, n_paths=n_paths, eps=eps)
-    if verbose:
-        print(f"      done in {time.time() - t0:.1f}s -- "
-              f"{result.landscape.describe()}")
+    _emit("analyzed", 60,
+          f"landscape ready in {time.time() - t0:.1f}s -- "
+          f"{result.landscape.describe()}")
 
-    if verbose:
-        print(f"[3/4] interpreting metrics via LLM...")
+    _emit("interpreting", 65,
+          "asking Claude to interpret the metrics mechanistically...")
     t0 = time.time()
     interpretation = interpret(result, client=client, model=model)
-    if verbose:
-        print(f"      done in {time.time() - t0:.1f}s "
-              f"({len(interpretation)} chars)")
+    _emit("interpreted", 90,
+          f"got {len(interpretation)} chars of analysis "
+          f"in {time.time() - t0:.1f}s")
 
-    if verbose:
-        print(f"[4/4] writing report and figure to {out_dir!r}...")
+    _emit("rendering", 92, f"writing figure and report to {out_dir!r}...")
     figure_path = os.path.join(out_dir, "landscape.png")
     spec_path = os.path.join(out_dir, "spec.json")
     report_path = os.path.join(out_dir, "report.md")
@@ -295,10 +308,7 @@ def analyze_emergence(
     write_spec_json(spec, spec_path)
     write_report(spec, result.system, result.landscape, interpretation,
                  report_path, figure_filename="landscape.png")
-    if verbose:
-        print(f"      report -> {report_path}")
-        print(f"      figure -> {figure_path}")
-        print(f"      spec   -> {spec_path}")
+    _emit("done", 100, "analysis complete.")
 
     return {
         "spec": spec,

@@ -9,3 +9,6 @@ torch>=2.0
 ripser>=0.6
 # optional: needed only for path_landscape.agent (LLM-powered analysis pipeline)
 anthropic>=0.40
+# optional: needed only for path_landscape.webapp (browser frontend)
+flask>=3.0
+markdown>=3.5
