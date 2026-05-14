@@ -10,6 +10,9 @@ demo_torch_landscape.png
 demo_compare.png
 demo_compare_serious.png
 
+# agent pipeline output
+emergence_analysis/
+
 # editor / OS
 .DS_Store
 .idea/

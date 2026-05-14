@@ -231,7 +231,7 @@ class PathLandscape:
         colors = [cluster_color[labels[i]] for i in keep]
 
         # Use a single ax.bar call for speed; alpha-vary by weight if requested.
-        if show_weight and weights.max() > 0:
+        if show_weight and len(weights) > 0 and weights.max() > 0:
             alphas = 0.40 + 0.55 * (weights / weights.max())
             rgba = []
             for col, a in zip(colors, alphas):
@@ -258,7 +258,7 @@ class PathLandscape:
         cluster_runs_sorted = sorted(
             cluster_runs, key=lambda r: -(r[2] - r[1])
         )
-        max_len = float(max(lengths.max(), 1))
+        max_len = float(max(lengths.max() if len(lengths) else 1, 1))
         ax.set_ylim(0, max_len * 1.18)
         for k, (c, s, e) in enumerate(cluster_runs_sorted[:label_top_k]):
             mid = (s + e - 1) / 2.0

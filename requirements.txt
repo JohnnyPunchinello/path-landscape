@@ -7,3 +7,5 @@ matplotlib>=3.6
 torch>=2.0
 # optional: needed only for persistence_h1 (dim-1 persistent homology)
 ripser>=0.6
+# optional: needed only for path_landscape.agent (LLM-powered analysis pipeline)
+anthropic>=0.40

@@ -36,12 +36,15 @@ from .metrics import (
     format_comparison,
 )
 
-# `extract` requires torch; import lazily so the rest of the package works
-# without it.
+# `extract` requires torch and `agent` requires anthropic; import lazily so
+# the rest of the package works without those.
 def __getattr__(name):
     if name in {"extract_mlp_flow", "extract_rnn_flow", "prune_system"}:
         from . import extract as _extract
         return getattr(_extract, name)
+    if name in {"analyze_emergence", "specify_system", "run_analysis"}:
+        from . import agent as _agent
+        return getattr(_agent, name)
     raise AttributeError(name)
 
 __all__ = [

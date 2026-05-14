@@ -47,8 +47,9 @@ Run the bundled demos:
 python demo.py                  # 4 structural examples; saves demo_landscape.png
 python demo_torch.py            # trains a small MLP, plots structural vs functional
 python demo_compare.py          # toy side-by-side comparison (4 metrics + persistence)
-python demo_compare_serious.py  # trains LM-like + Dale's-law-circuit on the same task,
-                                # extracts active paths, compares landscapes
+python demo_compare_serious.py  # LM-like + Dale's-law-circuit on the same task
+python demo_agent.py "..."      # LLM-powered end-to-end emergence analysis
+                                # (requires ANTHROPIC_API_KEY)
 ```
 
 ---
@@ -228,6 +229,48 @@ The four metrics:
 `persistence_h1` requires the optional `ripser` package; `persistence_h0`
 needs only `scipy`. See `demo_compare.py` for an end-to-end example.
 
+## Agentic pipeline: phenomenon → analysis → report
+
+`path_landscape.agent` turns a natural-language description of an emergent
+phenomenon into a full landscape analysis. The pipeline:
+
+1. **specify** — calls Claude with a structured-output tool to encode the
+   phenomenon as a `SystemSpec` (units, interactions including feedback
+   loops, multiscale `parent` relationships, time-unrolling, external
+   parameters).
+2. **build** — converts the spec into a `System`.
+3. **extract** — unrolls feedback loops in time, samples paths from inputs
+   to outputs (allowing readout at any time step after `T > 1`).
+4. **analyze** — clusters paths into modes; computes `n_modes`, cluster-size
+   exponent, H0 / H1 persistence, meta-graph connectivity.
+5. **interpret** — calls Claude again with the spec + metrics; returns a
+   focused mechanistic explanation of how the path structure produces (or
+   fails to produce) emergence in this system, plus a falsifiable prediction.
+6. **report** — saves `report.md`, `landscape.png`, and `spec.json` to a
+   chosen output directory.
+
+```python
+from path_landscape.agent import analyze_emergence
+
+result = analyze_emergence(
+    "A flock of starlings turning as one",
+    out_dir="./emergence_analysis/starling_flock",
+)
+print(result["interpretation"])
+```
+
+Or from the shell:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python demo_agent.py "Chain-of-thought reasoning emerging in a large language model"
+python demo_agent.py --all   # runs the 5 bundled example phenomena
+```
+
+The default model is `claude-opus-4-7`. The specifier uses tool use with
+`effort: medium`; the interpreter uses adaptive thinking with `effort: high`
+so its analysis is substantive. System prompts are prompt-cached.
+
 ## What's in the package
 
 ```
@@ -243,11 +286,18 @@ path_landscape/
                    # meta_graph, compare, format_comparison
   extract.py       # extract_mlp_flow, extract_rnn_flow, prune_system
                    # (build active-flow Systems from PyTorch forward passes)
+  agent/           # LLM-powered phenomenon -> analysis -> report pipeline
+    schemas.py     #   SystemSpec, SpecUnit, SpecInteraction, SpecParameter
+    prompts.py     #   tool definition + system prompts (cached)
+    builder.py     #   build_system_from_spec
+    pipeline.py    #   specify_system, run_analysis, interpret, analyze_emergence
+    visualize.py   #   multi-panel system + landscape + persistence figure
+    report.py      #   markdown report + spec.json
 demo.py                  # structural examples
 demo_torch.py            # trained-MLP structural vs functional landscape
 demo_compare.py          # toy side-by-side comparison
-demo_compare_serious.py  # trained LM-like vs Dale's-law GRU on the same task;
-                         # extracts active paths and compares landscapes
+demo_compare_serious.py  # LM-like vs Dale's-law-circuit on the same task
+demo_agent.py            # end-to-end LLM-powered analysis (requires API key)
 ```
 
 ### Visualizing landscapes two ways
