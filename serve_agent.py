@@ -8,6 +8,11 @@ Usage:
 """
 from __future__ import annotations
 
+# Force a non-interactive matplotlib backend before any plotting module
+# imports pyplot — figures will be rendered from a background worker thread.
+import matplotlib
+matplotlib.use("Agg", force=True)
+
 import argparse
 from pathlib import Path
 

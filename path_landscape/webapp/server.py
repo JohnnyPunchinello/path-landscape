@@ -1,6 +1,12 @@
 """Flask server for the path-landscape agent UI."""
 from __future__ import annotations
 
+# Force a non-interactive matplotlib backend BEFORE any other module pulls in
+# pyplot. The pipeline runs in a background thread, and the default macOS
+# backend (`MacOSX`) raises if used outside the main thread.
+import matplotlib
+matplotlib.use("Agg", force=True)
+
 import json
 import os
 import queue

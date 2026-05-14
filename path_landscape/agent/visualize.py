@@ -10,6 +10,13 @@ from __future__ import annotations
 import warnings
 from typing import Optional
 
+# If pyplot hasn't been imported yet, pin a non-interactive backend so this
+# module can be used from a worker thread (e.g. the Flask webapp). On macOS
+# the default `MacOSX` backend hard-fails outside the main thread. Setting
+# the backend after pyplot is already loaded is a no-op (and a warning).
+import matplotlib
+if "matplotlib.pyplot" not in __import__("sys").modules:
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
