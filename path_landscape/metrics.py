@@ -81,11 +81,16 @@ def persistence_h0(L: PathLandscape, max_features: int = 20) -> list[float]:
 
 
 def persistence_h1(
-    L: PathLandscape, max_features: int = 20
+    L: PathLandscape, max_features: Optional[int] = None
 ) -> Optional[list[tuple[float, float]]]:
     """Persistence pairs (birth, death) of dim-1 features (loops/holes) via
     Vietoris-Rips. Requires the `ripser` package; returns None if it isn't
     installed.
+
+    By default returns *all* features sorted by lifespan; pass `max_features`
+    to truncate. (Earlier versions defaulted to 20, which was a misleading
+    cap — comparisons appeared to "converge" at 20 because both systems
+    saturated the cap.)
     """
     try:
         from ripser import ripser
@@ -95,7 +100,9 @@ def persistence_h1(
     h1 = out["dgms"][1]
     pairs = [(float(b), float(d)) for b, d in h1]
     pairs.sort(key=lambda bd: -(bd[1] - bd[0]))  # by lifespan desc
-    return pairs[:max_features]
+    if max_features is not None:
+        pairs = pairs[:max_features]
+    return pairs
 
 
 # ------------------------------------------------------------ meta-graph
