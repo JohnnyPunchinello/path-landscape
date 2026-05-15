@@ -338,3 +338,120 @@ details summary {
   font-size: 12px;
   color: var(--brick);
 }
+
+/* ---------- ontology section (the "what you're looking at" key) ---------- */
+.ontology-section {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--cyan);
+  border-radius: 0 10px 10px 0;
+  padding: 18px 22px;
+  margin: 0 0 28px;
+}
+.ontology-section h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 14px;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.ontology-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.onto-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+  align-items: baseline;
+}
+.onto-row:last-child { border-bottom: none; }
+.onto-row dt {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.onto-row dd {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.onto-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  background: var(--paper-3);
+  color: var(--gray);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  vertical-align: 2px;
+}
+.onto-meta {
+  display: block;
+  margin-top: 4px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--gray);
+}
+.role-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, Menlo, monospace;
+  margin: 0 2px;
+}
+.role-input    { background: #d6f0f7; color: #0b5466; }
+.role-internal { background: #fbeacb; color: #6b4710; }
+.role-output   { background: #f7dad8; color: #7b1e1b; }
+
+@media (max-width: 720px) {
+  .onto-row { grid-template-columns: 1fr; gap: 4px; }
+}
+
+/* ---------- partial banner (when path landscape failed) ---------- */
+.partial-banner {
+  background: #fff5d8;
+  border: 1px solid #f3da94;
+  border-left: 4px solid var(--amber);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.partial-banner strong { color: #7b4a0c; }
+.partial-banner details { margin-top: 8px; padding: 6px 10px; background: var(--paper); }
+.partial-banner pre {
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--brick);
+  margin: 6px 0 0;
+}
+
+/* ---------- section lede (caption under each h2) ---------- */
+.section-lede {
+  margin: -8px 0 14px;
+  color: var(--gray);
+  font-size: 13px;
+}
+
+/* ---------- figure caption ---------- */
+.figure-caption {
+  margin: -20px 0 28px;
+  color: var(--gray);
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 0 6px;
+}
+.figure-caption strong { color: var(--ink); }

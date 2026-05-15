@@ -258,12 +258,19 @@ def analyze_emergence(
 ) -> dict:
     """Full pipeline: phenomenon (str) -> on-disk artifacts + result dict.
 
+    Robust to path-extraction failure: when the unrolled graph has no
+    input-to-output paths, a diagnostic figure is rendered instead of the
+    landscape figure, and a short diagnostic interpretation is written.
+    The frontend always receives a valid PNG, so the user never sees a
+    broken image.
+
     `on_progress` is an optional callback `on_progress(step, percent, message)`
     invoked at each pipeline stage. The web frontend uses this to stream
     progress to the browser.
     """
-    from .visualize import render_figure
+    from .visualize import render_figure, render_diagnostic_figure
     from .report import write_report, write_spec_json
+    from .builder import build_system_from_spec
 
     def _emit(step: str, percent: int, message: str) -> None:
         if verbose:
@@ -284,10 +291,67 @@ def analyze_emergence(
     _emit("specified", 30,
           f"got spec in {time.time() - t0:.1f}s -- {spec.summary()}")
 
+    figure_path = os.path.join(out_dir, "landscape.png")
+    spec_path = os.path.join(out_dir, "spec.json")
+    report_path = os.path.join(out_dir, "report.md")
+
+    # Always write spec.json early so it survives any later failure
+    write_spec_json(spec, spec_path)
+
     _emit("building", 35,
           f"building System and extracting paths (T={spec.time_steps})...")
     t0 = time.time()
-    result = run_analysis(spec, n_paths=n_paths, eps=eps)
+    try:
+        result = run_analysis(spec, n_paths=n_paths, eps=eps)
+    except RuntimeError as exc:
+        # Path extraction failed (e.g. no paths inputs→outputs after unrolling).
+        # Render the diagnostic figure so the frontend has a usable image,
+        # then return a partial result so the result page can still load.
+        err_msg = str(exc)
+        _emit("analysis_failed", 70,
+              f"path extraction failed: {err_msg}; rendering diagnostic figure")
+        sys_only = build_system_from_spec(spec)
+        render_diagnostic_figure(spec, sys_only, err_msg, figure_path)
+
+        diagnostic_interpretation = _diagnostic_interpretation(spec, err_msg)
+        # Minimal report
+        from .report import _format_spec
+        body = [
+            f"# {spec.phenomenon_name}\n",
+            f"*Path-landscape analysis — partial (no path landscape).*\n\n",
+            f"![diagnostic figure](landscape.png)\n\n",
+            f"## ⚠ Path landscape not computed\n\n",
+            f"Reason: `{err_msg}`\n\n",
+            f"The System was specified successfully, but no paths from "
+            f"input units to output units exist after unrolling over "
+            f"T = {spec.time_steps} time steps. The diagnostic figure "
+            f"shows the specified system and the unrolled graph so the "
+            f"connectivity gap is visible.\n\n",
+            _format_spec(spec),
+            "\n## Mechanistic interpretation (diagnostic)\n\n",
+            diagnostic_interpretation,
+            "\n",
+        ]
+        with open(report_path, "w") as f:
+            f.write("".join(body))
+        _emit("done", 100,
+              "analysis complete (partial — landscape unavailable).")
+
+        # Return a partial result; landscape/metrics are None
+        return {
+            "spec": spec,
+            "system": sys_only,
+            "landscape": None,
+            "metrics": None,
+            "interpretation": diagnostic_interpretation,
+            "out_dir": out_dir,
+            "report_path": report_path,
+            "figure_path": figure_path,
+            "spec_path": spec_path,
+            "partial": True,
+            "error": err_msg,
+        }
+
     _emit("analyzed", 60,
           f"landscape ready in {time.time() - t0:.1f}s -- "
           f"{result.landscape.describe()}")
@@ -301,11 +365,7 @@ def analyze_emergence(
           f"in {time.time() - t0:.1f}s")
 
     _emit("rendering", 92, f"writing figure and report to {out_dir!r}...")
-    figure_path = os.path.join(out_dir, "landscape.png")
-    spec_path = os.path.join(out_dir, "spec.json")
-    report_path = os.path.join(out_dir, "report.md")
     render_figure(spec, result.system, result.landscape, figure_path)
-    write_spec_json(spec, spec_path)
     write_report(spec, result.system, result.landscape, interpretation,
                  report_path, figure_filename="landscape.png")
     _emit("done", 100, "analysis complete.")
@@ -320,4 +380,92 @@ def analyze_emergence(
         "report_path": report_path,
         "figure_path": figure_path,
         "spec_path": spec_path,
+        "partial": False,
     }
+
+
+def _diagnostic_interpretation(spec: SystemSpec, error_msg: str) -> str:
+    """Path-structure diagnostic when no path landscape can be computed."""
+    n_in  = sum(1 for u in spec.units if u.role == "input")
+    n_out = sum(1 for u in spec.units if u.role == "output")
+    n_rec = sum(1 for x in spec.interactions if x.recurrent)
+    n_ff  = len(spec.interactions) - n_rec
+
+    # Heuristic: identify obvious connectivity holes
+    ff_inputs = {x.source for x in spec.interactions
+                 if not x.recurrent and any(u.name == x.source and u.role == "input"
+                                            for u in spec.units)}
+    ff_into_outputs = {x.target for x in spec.interactions
+                       if not x.recurrent and any(u.name == x.target and u.role == "output"
+                                                  for u in spec.units)}
+    output_names = {u.name for u in spec.units if u.role == "output"}
+    input_names  = {u.name for u in spec.units if u.role == "input"}
+    missing_out_edges = output_names - ff_into_outputs
+    missing_in_edges  = input_names - ff_inputs
+
+    parts = [
+        "**Path-structural mechanism.**",
+        f"No path landscape was computed because the specified path "
+        f"graph has a structural cut: no directed path connects any "
+        f"input unit to any output unit after unrolling over "
+        f"T = {spec.time_steps}.",
+        "",
+        "**Interpretation.**",
+        f"The specification provides {len(spec.units)} units "
+        f"({n_in} input, {n_out} output, "
+        f"{len(spec.units) - n_in - n_out} internal) and "
+        f"{len(spec.interactions)} interactions "
+        f"({n_ff} feed-forward, {n_rec} recurrent). ",
+    ]
+    if missing_out_edges:
+        parts.append(
+            f"The output unit(s) `{', '.join(sorted(missing_out_edges))}` "
+            f"have no incoming feed-forward edge — all incoming edges are "
+            f"recurrent (firing at the *next* time step), so they can "
+            f"never receive signal at the unrolling horizon. "
+        )
+    if missing_in_edges:
+        parts.append(
+            f"The input unit(s) `{', '.join(sorted(missing_in_edges))}` "
+            f"have no outgoing feed-forward edge — signal cannot leave "
+            f"the source. "
+        )
+    if not missing_out_edges and not missing_in_edges:
+        parts.append(
+            "Inputs and outputs are individually wired, but no chain "
+            "of feed-forward edges links the two cones within "
+            f"T = {spec.time_steps} steps. "
+        )
+    parts.append("")
+    parts.append("**Key bottleneck.**")
+    parts.append(
+        "The graph has a cut between the input cone and the output "
+        "cone in the unrolled (time-expanded) graph. The path "
+        "landscape is empty by construction; no path-structural "
+        "feature (clusters, hubs, loops, hierarchy, recurrence) can "
+        "be observed until the cut is closed."
+    )
+    parts.append("")
+    parts.append("**Falsifiable prediction.**")
+    if missing_out_edges:
+        target = sorted(missing_out_edges)[0]
+        parts.append(
+            f"Adding a single feed-forward edge from any internal unit "
+            f"into `{target}` would create at least one cluster "
+            f"(n_modes ≥ 1) and produce a non-degenerate path landscape."
+        )
+    elif missing_in_edges:
+        source = sorted(missing_in_edges)[0]
+        parts.append(
+            f"Adding a single feed-forward edge from `{source}` to any "
+            f"internal unit would propagate signal and produce a "
+            f"non-degenerate landscape (n_modes ≥ 1)."
+        )
+    else:
+        parts.append(
+            f"Increasing time_steps from {spec.time_steps} would not help: "
+            "the cut is structural, not temporal. Re-specifying with at "
+            "least one input→internal→…→output feed-forward chain is "
+            "required."
+        )
+    return "\n".join(parts)

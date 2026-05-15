@@ -165,6 +165,8 @@ def create_app(output_root: Path = DEFAULT_OUTPUT_ROOT) -> Flask:
             spec=res["spec"],
             system_summary=res["system_summary"],
             landscape_summary=res["landscape_summary"],
+            partial=res.get("partial", False),
+            partial_error=res.get("error"),
         )
 
     @app.route("/file/<job_id>/<path:filename>")
@@ -208,14 +210,20 @@ def _run_job(app: Flask, job_id: str) -> None:
         )
 
         spec: SystemSpec = result["spec"]
+        partial = bool(result.get("partial"))
+        L = result.get("landscape")
         job["result"] = {
             "phenomenon_name": spec.phenomenon_name,
             "phenomenon_summary": spec.phenomenon_summary,
             "interpretation": result["interpretation"],
-            "metrics": result["metrics"],
+            "metrics": result["metrics"],     # may be None on partial
             "spec": spec.to_dict(),
-            "landscape_summary": result["landscape"].describe(),
+            "landscape_summary": (L.describe() if L is not None
+                                  else "path landscape NOT computed "
+                                       "(path extraction failed; see figure)"),
             "system_summary": result["system"].summary(),
+            "partial": partial,
+            "error": result.get("error"),
         }
         job["status"] = "done"
         # Final event was already emitted by analyze_emergence as "done".

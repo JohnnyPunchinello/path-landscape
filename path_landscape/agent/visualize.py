@@ -153,68 +153,185 @@ def _draw_persistence(ax, L: PathLandscape) -> None:
 
 # ----------------------------------------------------------------- public
 
+def _draw_ontology_panel(ax, spec: SystemSpec, sys: System,
+                         L: Optional[PathLandscape] = None) -> None:
+    """A header panel that names what the diagram is showing in framework terms.
+
+    This is the user-facing answer to:
+        - What is the System?
+        - What is a Unit (basic computation)?
+        - What is an Interaction (information flow)?
+        - Is there multiscale structure?
+        - What are the Observables / emergent phenomenon?
+    """
+    ax.axis("off")
+    ax.set_facecolor(PAPER)
+    # Title
+    ax.text(0.0, 1.00, spec.phenomenon_name,
+            ha="left", va="top", fontsize=15, fontweight="bold", color=INK)
+    ax.text(0.0, 0.86,
+            f"System  ·  path-landscape view of an emergent phenomenon",
+            ha="left", va="top", fontsize=10, color=GRAY,
+            fontstyle="italic")
+
+    # Role counts
+    n_in  = sum(1 for u in spec.units if u.role == "input")
+    n_out = sum(1 for u in spec.units if u.role == "output")
+    n_int = sum(1 for u in spec.units if u.role == "internal")
+    n_rec = sum(1 for x in spec.interactions if x.recurrent)
+    scales = sorted({u.scale for u in spec.units})
+    multiscale = len(scales) > 1
+    n_modes = (L.n_modes if L is not None else None)
+    h1 = (persistence_h1(L) if L is not None else None)
+
+    rows = [
+        ("System",
+         f"{len(sys.units)} units · {sys.graph.number_of_edges()} interactions · "
+         f"T = {spec.time_steps}"),
+        ("Unit (basic computation)",
+         f"{len(spec.units)} total  ({n_in} input · {n_int} internal · {n_out} output)"),
+        ("Interaction (information flow)",
+         f"{len(spec.interactions)} directed edges, "
+         f"{n_rec} recurrent (feedback loops in time)"),
+        ("Multiscale structure",
+         f"scales = {scales}"
+         f" — {'hierarchical (parent/child grouping)' if multiscale else 'single scale'}"),
+        ("Observable",
+         "outputs: " + (", ".join(u.name for u in spec.units if u.role == "output")
+                       or "(none specified)")),
+        ("Emergent phenomenon",
+         (f"path landscape with {n_modes} modes"
+          + (f", {len(h1)} compositional loops (H1)" if h1 else "")
+          + " — see right-side panels") if L is not None
+         else "path landscape NOT computed (path extraction failed; see annotation)"),
+    ]
+    y = 0.70
+    for label, value in rows:
+        ax.text(0.0, y, f"{label}:", ha="left", va="top",
+                fontsize=9.5, fontweight="bold", color=INK)
+        ax.text(0.34, y, value, ha="left", va="top",
+                fontsize=9.5, color=INK, wrap=True)
+        y -= 0.10
+
+
 def render_figure(
     spec: SystemSpec, sys: System, L: PathLandscape, out_path: str
 ) -> None:
-    """Render the multi-panel analysis figure and save to `out_path`."""
-    fig = plt.figure(figsize=(15, 12), facecolor=PAPER)
+    """Render the multi-panel analysis figure and save to `out_path`.
+
+    Layout encodes the framework ontology:
+
+        row 0 : ontology panel (left)     · original system graph (right)
+        row 1 : unrolled path graph       · path landscape (MDS scatter)
+        row 2 : paths-by-cluster bars     · persistence diagram
+
+    Each panel title says explicitly what the panel shows in framework terms.
+    """
+    fig = plt.figure(figsize=(15, 12.5), facecolor=PAPER)
     gs = fig.add_gridspec(
-        3, 2, height_ratios=[1.1, 1.0, 1.0],
-        hspace=0.45, wspace=0.25,
-        top=0.94, bottom=0.05, left=0.06, right=0.97,
+        3, 2, height_ratios=[1.0, 1.0, 1.0],
+        hspace=0.40, wspace=0.22,
+        top=0.96, bottom=0.05, left=0.05, right=0.97,
     )
 
-    ax_sys = fig.add_subplot(gs[0, 0])
+    # Row 0: ontology panel + system graph
+    ax_onto = fig.add_subplot(gs[0, 0])
+    _draw_ontology_panel(ax_onto, spec, sys, L)
+
+    ax_sys = fig.add_subplot(gs[0, 1])
     _draw_system_graph(ax_sys, sys, spec)
 
-    ax_static = fig.add_subplot(gs[0, 1])
+    # Row 1: unrolled graph + landscape
+    ax_static = fig.add_subplot(gs[1, 0])
     _draw_static_path_graph(ax_static, sys, spec.time_steps)
 
-    ax_land = fig.add_subplot(gs[1, 0])
+    ax_land = fig.add_subplot(gs[1, 1])
     L.plot(ax=ax_land, show_legend=False,
-           title=f"path landscape ({L.n_modes} modes, "
-                 f"{len(L.paths)} paths)")
+           title=f"Path landscape — observable / emergent structure\n"
+                 f"({L.n_modes} modes · {len(L.paths)} paths · "
+                 f"each point = one input→output path)")
 
-    ax_bars = fig.add_subplot(gs[1, 1])
+    # Row 2: cluster bars + persistence
+    ax_bars = fig.add_subplot(gs[2, 0])
     L.plot_length_by_cluster(
         ax=ax_bars, drop_noise=True, label_top_k=8,
-        title="paths by cluster, length on y-axis",
+        title="Modes (clusters) of paths · length on y-axis",
     )
 
-    ax_pers = fig.add_subplot(gs[2, 0])
+    ax_pers = fig.add_subplot(gs[2, 1])
     _draw_persistence(ax_pers, L)
 
-    # banner with the phenomenon summary on the bottom-right
-    ax_text = fig.add_subplot(gs[2, 1])
-    ax_text.axis("off")
-    ax_text.text(
-        0.0, 1.0, spec.phenomenon_name,
-        ha="left", va="top",
-        fontsize=14, fontweight="bold", color=INK,
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def render_diagnostic_figure(
+    spec: SystemSpec, sys: System, error_message: str, out_path: str,
+) -> None:
+    """Render a 'path landscape not available' figure when path extraction fails.
+
+    Shows the ontology panel + the system graph + the unrolled (static) graph
+    + a clear annotation panel explaining why no paths were found and what to
+    check. Always produces a usable PNG, so the frontend never has a missing
+    image.
+    """
+    fig = plt.figure(figsize=(15, 9.5), facecolor=PAPER)
+    gs = fig.add_gridspec(
+        2, 2, height_ratios=[1.0, 1.0],
+        hspace=0.40, wspace=0.22,
+        top=0.96, bottom=0.05, left=0.05, right=0.97,
     )
-    ax_text.text(
-        0.0, 0.85, spec.phenomenon_summary,
-        ha="left", va="top",
-        fontsize=10, color=INK, wrap=True,
-    )
-    bullets = []
-    lengths = [p.length for p in L.paths]
-    bullets.append(
-        f"path length range: {min(lengths)} - {max(lengths)} "
-        f"(mean {np.mean(lengths):.2f})"
-    )
-    bullets.append(f"clusters: {L.n_modes} modes")
-    h1 = persistence_h1(L)
-    if h1 is not None:
-        bullets.append(f"H1 features (compositional loops): {len(h1)}")
-    bullets.append(
-        f"system: {len(sys.units)} units, {sys.graph.number_of_edges()} edges"
-    )
-    for i, line in enumerate(bullets):
-        ax_text.text(
-            0.0, 0.55 - i * 0.10, "• " + line,
-            ha="left", va="top", fontsize=9, color=INK,
-        )
+
+    # Row 0: ontology + system graph
+    ax_onto = fig.add_subplot(gs[0, 0])
+    _draw_ontology_panel(ax_onto, spec, sys, L=None)
+
+    ax_sys = fig.add_subplot(gs[0, 1])
+    _draw_system_graph(ax_sys, sys, spec)
+
+    # Row 1: unrolled graph + diagnostic annotation
+    ax_static = fig.add_subplot(gs[1, 0])
+    try:
+        _draw_static_path_graph(ax_static, sys, spec.time_steps)
+    except Exception as exc:
+        ax_static.axis("off")
+        ax_static.text(0.5, 0.5, f"(unrolled graph render failed: {exc})",
+                       ha="center", va="center", fontsize=9, color=BRICK)
+
+    ax_diag = fig.add_subplot(gs[1, 1])
+    ax_diag.axis("off")
+    ax_diag.set_facecolor("#fff0ee")
+    ax_diag.text(0.02, 0.96,
+                 "⚠  Path landscape not available",
+                 ha="left", va="top", fontsize=13, fontweight="bold",
+                 color=BRICK)
+    ax_diag.text(0.02, 0.86,
+                 "Path extraction from inputs to outputs returned no paths "
+                 "after unrolling.\n\n"
+                 f"Reported error:\n  {error_message}\n\n"
+                 "Likely causes (check the System spec on the left):",
+                 ha="left", va="top", fontsize=9.5, color=INK, wrap=True)
+    causes = [
+        "  ·  An output unit has no incoming feed-forward edge",
+        "  ·  An input unit has no outgoing feed-forward edge",
+        "  ·  All edges from internals to outputs are marked recurrent",
+        "  ·  time_steps is too small to traverse from input to output",
+        "  ·  The graph has a cut between the input cone and the output cone",
+    ]
+    for i, c in enumerate(causes):
+        ax_diag.text(0.02, 0.42 - i * 0.07, c,
+                     ha="left", va="top", fontsize=9, color=INK,
+                     family="monospace")
+    ax_diag.text(0.02, 0.04,
+                 "The ontology panel and system graph above still describe what was specified.",
+                 ha="left", va="top", fontsize=8.5, color=GRAY,
+                 fontstyle="italic")
+
+    # Border emphasising the diagnostic
+    for spine in ax_diag.spines.values():
+        spine.set_visible(True)
+        spine.set_edgecolor(BRICK)
+        spine.set_linewidth(1.0)
 
     plt.savefig(out_path, dpi=150)
     plt.close(fig)
